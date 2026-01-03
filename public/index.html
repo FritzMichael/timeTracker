@@ -119,6 +119,38 @@
             border: 2px solid #f59e0b;
         }
         
+        .last-task {
+            background: #f9fafb;
+            border-left: 4px solid #2563eb;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        
+        .last-task-label {
+            font-weight: 600;
+            color: #6b7280;
+            font-size: 12px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        
+        .last-task-content {
+            color: #374151;
+            line-height: 1.5;
+        }
+        
+        .last-task-date {
+            font-size: 11px;
+            color: #9ca3af;
+            margin-top: 4px;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
         button {
             width: 100%;
             padding: 16px;
@@ -739,6 +771,12 @@
             
             <div id="status" class="status"></div>
             
+            <div id="last-task" class="last-task hidden">
+                <div class="last-task-label">Last worked on</div>
+                <div class="last-task-content" id="last-task-content"></div>
+                <div class="last-task-date" id="last-task-date"></div>
+            </div>
+            
             <div class="tab-buttons">
                 <button class="active" onclick="switchTab('clock')">Clock In/Out</button>
                 <button onclick="switchTab('history')">History</button>
@@ -1143,6 +1181,36 @@
             const statusEl = document.getElementById('status');
             const clockInSection = document.getElementById('clock-in-section');
             const clockOutSection = document.getElementById('clock-out-section');
+            const lastTaskEl = document.getElementById('last-task');
+            const lastTaskContentEl = document.getElementById('last-task-content');
+            const lastTaskDateEl = document.getElementById('last-task-date');
+            
+            // Display last comment if available
+            if (currentStatus.lastComment) {
+                lastTaskEl.classList.remove('hidden');
+                lastTaskContentEl.textContent = currentStatus.lastComment;
+                
+                // Format the date nicely
+                if (currentStatus.lastCommentDate) {
+                    const date = new Date(currentStatus.lastCommentDate + 'T00:00:00');
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const yesterday = new Date(today);
+                    yesterday.setDate(yesterday.getDate() - 1);
+                    
+                    let dateStr;
+                    if (date.getTime() === today.getTime()) {
+                        dateStr = 'Today';
+                    } else if (date.getTime() === yesterday.getTime()) {
+                        dateStr = 'Yesterday';
+                    } else {
+                        dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                    }
+                    lastTaskDateEl.textContent = dateStr;
+                }
+            } else {
+                lastTaskEl.classList.add('hidden');
+            }
             
             if (!currentStatus.hasEntry || currentStatus.checkedOut) {
                 statusEl.className = 'status';

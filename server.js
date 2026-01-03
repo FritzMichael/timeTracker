@@ -322,11 +322,17 @@ app.get('/api/status', requireAuth, (req, res) => {
   const stmt = db.prepare('SELECT * FROM entries WHERE user_id = ? AND date = ? ORDER BY id DESC LIMIT 1');
   const entry = stmt.get(req.user.id, today);
   
+  // Get the last entry with a comment (could be from a previous day)
+  const lastCommentStmt = db.prepare('SELECT comment, date FROM entries WHERE user_id = ? AND comment IS NOT NULL AND comment != "" ORDER BY date DESC, id DESC LIMIT 1');
+  const lastCommentEntry = lastCommentStmt.get(req.user.id);
+  
   const status = {
     hasEntry: !!entry,
     checkedIn: entry?.check_in && !entry?.check_out,
     checkedOut: entry?.check_out,
-    entry: entry || null
+    entry: entry || null,
+    lastComment: lastCommentEntry?.comment || null,
+    lastCommentDate: lastCommentEntry?.date || null
   };
   
   res.json(status);
@@ -385,10 +391,16 @@ app.post('/api/toggle', requireAuth, (req, res) => {
     const insertStmt = db.prepare('INSERT INTO entries (user_id, date, check_in) VALUES (?, ?, ?)');
     const result = insertStmt.run(req.user.id, today, now);
     
+    // Get the last entry with a comment
+    const lastCommentStmt = db.prepare('SELECT comment, date FROM entries WHERE user_id = ? AND comment IS NOT NULL AND comment != "" ORDER BY date DESC, id DESC LIMIT 1');
+    const lastCommentEntry = lastCommentStmt.get(req.user.id);
+    
     return res.json({ 
       action: 'check-in', 
       time: now,
-      entryId: result.lastInsertRowid
+      entryId: result.lastInsertRowid,
+      lastComment: lastCommentEntry?.comment || null,
+      lastCommentDate: lastCommentEntry?.date || null
     });
   }
   

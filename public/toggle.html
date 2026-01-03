@@ -173,6 +173,35 @@
             color: #6b7280;
             margin-bottom: 16px;
         }
+        
+        .last-task-reminder {
+            background: #f9fafb;
+            border-left: 4px solid #2563eb;
+            padding: 16px;
+            border-radius: 8px;
+            margin-top: 24px;
+            text-align: left;
+        }
+        
+        .last-task-label {
+            font-weight: 600;
+            color: #6b7280;
+            font-size: 12px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        
+        .last-task-content {
+            color: #374151;
+            line-height: 1.5;
+            font-size: 14px;
+        }
+        
+        .last-task-date {
+            font-size: 11px;
+            color: #9ca3af;
+            margin-top: 4px;
+        }
     </style>
 </head>
 <body>
@@ -189,6 +218,12 @@
             <div class="icon success">✓</div>
             <h1>Checked In!</h1>
             <p class="subtitle" id="checkin-time"></p>
+            
+            <div id="last-task-reminder" class="last-task-reminder hidden">
+                <div class="last-task-label">Last worked on</div>
+                <div class="last-task-content" id="last-task-content"></div>
+                <div class="last-task-date" id="last-task-date"></div>
+            </div>
         </div>
         
         <!-- Check-out State -->
@@ -251,14 +286,44 @@
                 
                 if (data.action === 'check-in') {
                     document.getElementById('checkin-time').textContent = `Started at ${data.time}`;
+                    
+                    // Display last task if available
+                    if (data.lastComment) {
+                        const lastTaskEl = document.getElementById('last-task-reminder');
+                        const lastTaskContentEl = document.getElementById('last-task-content');
+                        const lastTaskDateEl = document.getElementById('last-task-date');
+                        
+                        lastTaskEl.classList.remove('hidden');
+                        lastTaskContentEl.textContent = data.lastComment;
+                        
+                        // Format the date
+                        if (data.lastCommentDate) {
+                            const date = new Date(data.lastCommentDate + 'T00:00:00');
+                            const today = new Date();
+                            today.setHours(0, 0, 0, 0);
+                            const yesterday = new Date(today);
+                            yesterday.setDate(yesterday.getDate() - 1);
+                            
+                            let dateStr;
+                            if (date.getTime() === today.getTime()) {
+                                dateStr = 'Today';
+                            } else if (date.getTime() === yesterday.getTime()) {
+                                dateStr = 'Yesterday';
+                            } else {
+                                dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                            }
+                            lastTaskDateEl.textContent = dateStr;
+                        }
+                    }
+                    
                     showState('checkin');
                     
-                    // Auto-close after 3 seconds
+                    // Auto-close after 5 seconds (extended from 3 to give time to read)
                     setTimeout(() => {
                         window.close();
                         // If window.close doesn't work (not opened by script), redirect
                         window.location.href = '/';
-                    }, 3000);
+                    }, 5000);
                     
                 } else if (data.action === 'check-out') {
                     currentEntryId = data.entryId;
