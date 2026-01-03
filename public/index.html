@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Time Tracker</title>
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
     <link rel="manifest" href="/manifest.json">
     <link rel="apple-touch-icon" href="/icon-192.png">
     <meta name="theme-color" content="#2563eb">
@@ -41,6 +42,15 @@
             color: #1f2937;
             margin-bottom: 24px;
             font-size: 28px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .app-icon {
+            width: 32px;
+            height: 32px;
+            vertical-align: middle;
         }
         
         h2 {
@@ -648,12 +658,18 @@
         }
         
         .time-picker-wrapper::after {
-            content: '🕐';
+            content: '';
             position: absolute;
             right: 12px;
             top: 50%;
             transform: translateY(-50%);
             pointer-events: none;
+            width: 20px;
+            height: 20px;
+            background-image: url('/icon-192.png');
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
         }
         
         /* Modal positioning context for flatpickr */
@@ -670,7 +686,10 @@
     <!-- Auth Section (shown when logged out) -->
     <div id="auth-section" class="auth-container hidden">
         <div class="container">
-            <h1 style="text-align: center;">⏰ Time Tracker</h1>
+            <h1 style="text-align: center; justify-content: center;">
+                <img src="/icon-192.png" alt="Time Tracker" class="app-icon">
+                Time Tracker
+            </h1>
             
             <div id="auth-error" class="error-message hidden"></div>
             
@@ -707,7 +726,10 @@
     <div id="app-section" class="hidden">
         <div class="container">
             <div class="header">
-                <h1>⏰ Time Tracker</h1>
+                <h1>
+                    <img src="/icon-192.png" alt="Time Tracker" class="app-icon">
+                    Time Tracker
+                </h1>
                 <div class="user-info">
                     <img id="user-avatar" src="" alt="" class="hidden">
                     <span id="user-name"></span>
