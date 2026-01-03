@@ -318,24 +318,40 @@ app.get('/api/vapid-public-key', (req, res) => {
 });
 
 app.get('/api/status', requireAuth, (req, res) => {
-  const today = new Date().toISOString().split('T')[0];
-  const stmt = db.prepare('SELECT * FROM entries WHERE user_id = ? AND date = ? ORDER BY id DESC LIMIT 1');
-  const entry = stmt.get(req.user.id, today);
-  
-  // Get the last entry with a comment (could be from a previous day)
-  const lastCommentStmt = db.prepare('SELECT comment, date FROM entries WHERE user_id = ? AND comment IS NOT NULL AND comment != "" ORDER BY date DESC, id DESC LIMIT 1');
-  const lastCommentEntry = lastCommentStmt.get(req.user.id);
-  
-  const status = {
-    hasEntry: !!entry,
-    checkedIn: entry?.check_in && !entry?.check_out,
-    checkedOut: entry?.check_out,
-    entry: entry || null,
-    lastComment: lastCommentEntry?.comment || null,
-    lastCommentDate: lastCommentEntry?.date || null
-  };
-  
-  res.json(status);
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const stmt = db.prepare('SELECT * FROM entries WHERE user_id = ? AND date = ? ORDER BY id DESC LIMIT 1');
+    const entry = stmt.get(req.user.id, today);
+    
+    // Get the last entry with a comment (could be from a previous day)
+    let lastComment = null;
+    let lastCommentDate = null;
+    try {
+      const lastCommentStmt = db.prepare('SELECT comment, date FROM entries WHERE user_id = ? AND comment IS NOT NULL AND comment != ? ORDER BY date DESC, id DESC LIMIT 1');
+      const lastCommentEntry = lastCommentStmt.get(req.user.id, '');
+      if (lastCommentEntry) {
+        lastComment = lastCommentEntry.comment;
+        lastCommentDate = lastCommentEntry.date;
+      }
+    } catch (commentErr) {
+      console.error('Error fetching last comment:', commentErr);
+      // Continue without the last comment feature
+    }
+    
+    const status = {
+      hasEntry: !!entry,
+      checkedIn: entry?.check_in && !entry?.check_out,
+      checkedOut: !!entry?.check_out,
+      entry: entry || null,
+      lastComment: lastComment,
+      lastCommentDate: lastCommentDate
+    };
+    
+    res.json(status);
+  } catch (err) {
+    console.error('Error in /api/status:', err);
+    res.status(500).json({ error: 'Failed to get status' });
+  }
 });
 
 app.post('/api/clock-in', requireAuth, (req, res) => {
@@ -379,55 +395,70 @@ app.post('/api/clock-out', requireAuth, (req, res) => {
 
 // Toggle endpoint for NFC/quick check-in/out
 app.post('/api/toggle', requireAuth, (req, res) => {
-  const today = new Date().toISOString().split('T')[0];
-  const now = new Date().toTimeString().slice(0, 5);
-  
-  // Check current status
-  const stmt = db.prepare('SELECT * FROM entries WHERE user_id = ? AND date = ? ORDER BY id DESC LIMIT 1');
-  const entry = stmt.get(req.user.id, today);
-  
-  // If no entry today or already checked out -> check in
-  if (!entry || entry.check_out) {
-    const insertStmt = db.prepare('INSERT INTO entries (user_id, date, check_in) VALUES (?, ?, ?)');
-    const result = insertStmt.run(req.user.id, today, now);
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const now = new Date().toTimeString().slice(0, 5);
     
-    // Get the last entry with a comment
-    const lastCommentStmt = db.prepare('SELECT comment, date FROM entries WHERE user_id = ? AND comment IS NOT NULL AND comment != "" ORDER BY date DESC, id DESC LIMIT 1');
-    const lastCommentEntry = lastCommentStmt.get(req.user.id);
+    // Check current status
+    const stmt = db.prepare('SELECT * FROM entries WHERE user_id = ? AND date = ? ORDER BY id DESC LIMIT 1');
+    const entry = stmt.get(req.user.id, today);
     
-    return res.json({ 
-      action: 'check-in', 
-      time: now,
-      entryId: result.lastInsertRowid,
-      lastComment: lastCommentEntry?.comment || null,
-      lastCommentDate: lastCommentEntry?.date || null
-    });
+    // If no entry today or already checked out -> check in
+    if (!entry || entry.check_out) {
+      const insertStmt = db.prepare('INSERT INTO entries (user_id, date, check_in) VALUES (?, ?, ?)');
+      const result = insertStmt.run(req.user.id, today, now);
+      
+      // Get the last entry with a comment
+      let lastComment = null;
+      let lastCommentDate = null;
+      try {
+        const lastCommentStmt = db.prepare('SELECT comment, date FROM entries WHERE user_id = ? AND comment IS NOT NULL AND comment != ? ORDER BY date DESC, id DESC LIMIT 1');
+        const lastCommentEntry = lastCommentStmt.get(req.user.id, '');
+        if (lastCommentEntry) {
+          lastComment = lastCommentEntry.comment;
+          lastCommentDate = lastCommentEntry.date;
+        }
+      } catch (commentErr) {
+        console.error('Error fetching last comment:', commentErr);
+      }
+      
+      return res.json({ 
+        action: 'check-in', 
+        time: now,
+        entryId: result.lastInsertRowid,
+        lastComment: lastComment,
+        lastCommentDate: lastCommentDate
+      });
+    }
+    
+    // If checked in but not out -> check out
+    if (entry.check_in && !entry.check_out) {
+      const updateStmt = db.prepare('UPDATE entries SET check_out = ? WHERE id = ? AND user_id = ?');
+      updateStmt.run(now, entry.id, req.user.id);
+      
+      // Calculate duration
+      const [inH, inM] = entry.check_in.split(':').map(Number);
+      const [outH, outM] = now.split(':').map(Number);
+      const totalMinutes = (outH * 60 + outM) - (inH * 60 + inM);
+      const hours = Math.floor(totalMinutes / 60);
+      const minutes = totalMinutes % 60;
+      const duration = `${hours}h ${minutes}m`;
+      
+      return res.json({ 
+        action: 'check-out', 
+        time: now,
+        checkIn: entry.check_in,
+        checkOut: now,
+        duration,
+        entryId: entry.id
+      });
+    }
+    
+    res.status(400).json({ error: 'Unknown state' });
+  } catch (err) {
+    console.error('Error in /api/toggle:', err);
+    res.status(500).json({ error: 'Toggle failed' });
   }
-  
-  // If checked in but not out -> check out
-  if (entry.check_in && !entry.check_out) {
-    const updateStmt = db.prepare('UPDATE entries SET check_out = ? WHERE id = ? AND user_id = ?');
-    updateStmt.run(now, entry.id, req.user.id);
-    
-    // Calculate duration
-    const [inH, inM] = entry.check_in.split(':').map(Number);
-    const [outH, outM] = now.split(':').map(Number);
-    const totalMinutes = (outH * 60 + outM) - (inH * 60 + inM);
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
-    const duration = `${hours}h ${minutes}m`;
-    
-    return res.json({ 
-      action: 'check-out', 
-      time: now,
-      checkIn: entry.check_in,
-      checkOut: now,
-      duration,
-      entryId: entry.id
-    });
-  }
-  
-  res.status(400).json({ error: 'Unknown state' });
 });
 
 // Update comment for an entry (used by toggle page)
