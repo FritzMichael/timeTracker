@@ -16,6 +16,9 @@ const fs = require('fs');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Trust proxy - needed when behind Caddy/nginx
+app.set('trust proxy', 1);
+
 // Middleware
 app.use(express.json());
 app.use(express.static('public'));
