@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Time Tracker - Toggle</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#2563eb">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #f3f4f6;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 24px;
+            padding: 48px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 400px;
+            width: 100%;
+        }
+        
+        .icon {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 24px;
+            font-size: 60px;
+            animation: pop 0.4s ease-out;
+        }
+        
+        @keyframes pop {
+            0% { transform: scale(0); opacity: 0; }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        .icon.success {
+            background: #dcfce7;
+            color: #16a34a;
+        }
+        
+        .icon.checkout {
+            background: #dbeafe;
+            color: #2563eb;
+        }
+        
+        .icon.loading {
+            background: #f3f4f6;
+            color: #6b7280;
+            animation: pulse 1s infinite;
+        }
+        
+        .icon.error {
+            background: #fef2f2;
+            color: #dc2626;
+        }
+        
+        h1 {
+            font-size: 28px;
+            color: #1f2937;
+            margin-bottom: 8px;
+        }
+        
+        .subtitle {
+            font-size: 18px;
+            color: #6b7280;
+            margin-bottom: 24px;
+        }
+        
+        .time-display {
+            font-size: 48px;
+            font-weight: 700;
+            color: #2563eb;
+            margin-bottom: 8px;
+        }
+        
+        .time-label {
+            font-size: 14px;
+            color: #6b7280;
+            margin-bottom: 24px;
+        }
+        
+        .comment-section {
+            margin-top: 24px;
+        }
+        
+        textarea {
+            width: 100%;
+            padding: 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            font-size: 16px;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 100px;
+            margin-bottom: 16px;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: #2563eb;
+        }
+        
+        button {
+            width: 100%;
+            padding: 16px 32px;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        .btn-primary {
+            background: #2563eb;
+            color: white;
+        }
+        
+        .btn-secondary {
+            background: #e5e7eb;
+            color: #374151;
+            margin-top: 12px;
+        }
+        
+        .login-prompt {
+            padding: 24px;
+        }
+        
+        .login-prompt a {
+            color: #2563eb;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        
+        .login-prompt a:hover {
+            text-decoration: underline;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        .check-times {
+            font-size: 14px;
+            color: #6b7280;
+            margin-bottom: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Loading State -->
+        <div id="loading-state">
+            <div class="icon loading">⏳</div>
+            <h1>Processing...</h1>
+            <p class="subtitle">Please wait</p>
+        </div>
+        
+        <!-- Check-in Success -->
+        <div id="checkin-state" class="hidden">
+            <div class="icon success">✓</div>
+            <h1>Checked In!</h1>
+            <p class="subtitle" id="checkin-time"></p>
+        </div>
+        
+        <!-- Check-out State -->
+        <div id="checkout-state" class="hidden">
+            <div class="icon checkout">🏁</div>
+            <h1>Checked Out!</h1>
+            <div class="time-display" id="duration"></div>
+            <p class="time-label">Time worked today</p>
+            <div class="check-times" id="check-times"></div>
+            
+            <div class="comment-section">
+                <textarea id="comment" placeholder="What did you work on today? (optional)"></textarea>
+                <button class="btn-primary" onclick="saveComment()">Save & Close</button>
+                <button class="btn-secondary" onclick="skipComment()">Skip</button>
+            </div>
+        </div>
+        
+        <!-- Error State -->
+        <div id="error-state" class="hidden">
+            <div class="icon error">✕</div>
+            <h1>Error</h1>
+            <p class="subtitle" id="error-message"></p>
+            <button class="btn-primary" onclick="retry()">Try Again</button>
+        </div>
+        
+        <!-- Login Required -->
+        <div id="login-state" class="hidden">
+            <div class="icon error">🔒</div>
+            <h1>Login Required</h1>
+            <p class="subtitle">Please log in to use the toggle feature</p>
+            <div class="login-prompt">
+                <a href="/">Go to Login</a>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let currentEntryId = null;
+        
+        async function toggle() {
+            showState('loading');
+            
+            try {
+                const res = await fetch('/api/toggle', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (res.status === 401) {
+                    showState('login');
+                    return;
+                }
+                
+                if (!res.ok) {
+                    const error = await res.json();
+                    throw new Error(error.error || 'Toggle failed');
+                }
+                
+                const data = await res.json();
+                
+                if (data.action === 'check-in') {
+                    document.getElementById('checkin-time').textContent = `Started at ${data.time}`;
+                    showState('checkin');
+                    
+                    // Auto-close after 3 seconds
+                    setTimeout(() => {
+                        window.close();
+                        // If window.close doesn't work (not opened by script), redirect
+                        window.location.href = '/';
+                    }, 3000);
+                    
+                } else if (data.action === 'check-out') {
+                    currentEntryId = data.entryId;
+                    document.getElementById('duration').textContent = data.duration;
+                    document.getElementById('check-times').textContent = `${data.checkIn} → ${data.checkOut}`;
+                    showState('checkout');
+                }
+                
+            } catch (err) {
+                document.getElementById('error-message').textContent = err.message;
+                showState('error');
+            }
+        }
+        
+        async function saveComment() {
+            const comment = document.getElementById('comment').value.trim();
+            
+            if (currentEntryId && comment) {
+                try {
+                    await fetch(`/api/entries/${currentEntryId}/comment`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ comment })
+                    });
+                } catch (err) {
+                    console.error('Failed to save comment:', err);
+                }
+            }
+            
+            closeOrRedirect();
+        }
+        
+        function skipComment() {
+            closeOrRedirect();
+        }
+        
+        function closeOrRedirect() {
+            window.close();
+            // If window.close doesn't work, redirect after a moment
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 100);
+        }
+        
+        function retry() {
+            toggle();
+        }
+        
+        function showState(state) {
+            document.getElementById('loading-state').classList.add('hidden');
+            document.getElementById('checkin-state').classList.add('hidden');
+            document.getElementById('checkout-state').classList.add('hidden');
+            document.getElementById('error-state').classList.add('hidden');
+            document.getElementById('login-state').classList.add('hidden');
+            
+            document.getElementById(`${state}-state`).classList.remove('hidden');
+        }
+        
+        // Start toggle on page load
+        toggle();
+    </script>
+</body>
+</html>

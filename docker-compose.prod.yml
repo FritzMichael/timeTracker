@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  timetracker:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

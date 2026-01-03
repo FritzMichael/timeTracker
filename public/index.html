@@ -1,0 +1,1430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Time Tracker</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#2563eb">
+    <!-- Flatpickr for calendar and time picker (local) -->
+    <link rel="stylesheet" href="/vendor/flatpickr.min.css">
+    <link rel="stylesheet" href="/vendor/flatpickr-airbnb.css">
+    <script src="/vendor/flatpickr.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #f3f4f6;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        h1 {
+            color: #1f2937;
+            margin-bottom: 24px;
+            font-size: 28px;
+        }
+        
+        h2 {
+            color: #374151;
+            margin-bottom: 16px;
+            font-size: 20px;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+        
+        .header h1 {
+            margin-bottom: 0;
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .user-info img {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+        }
+        
+        .user-info span {
+            font-weight: 500;
+            color: #374151;
+        }
+        
+        .btn-logout {
+            padding: 8px 16px;
+            font-size: 14px;
+            width: auto;
+            margin: 0;
+        }
+        
+        .status {
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 16px;
+        }
+        
+        .status.checked-in {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 2px solid #3b82f6;
+        }
+        
+        .status.checked-out {
+            background: #dcfce7;
+            color: #166534;
+            border: 2px solid #22c55e;
+        }
+        
+        .status.warning {
+            background: #fef3c7;
+            color: #92400e;
+            border: 2px solid #f59e0b;
+        }
+        
+        button {
+            width: 100%;
+            padding: 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 12px;
+            transition: all 0.2s;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        .btn-primary {
+            background: #2563eb;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #1d4ed8;
+        }
+        
+        .btn-secondary {
+            background: #10b981;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #059669;
+        }
+        
+        .btn-outline {
+            background: white;
+            color: #374151;
+            border: 2px solid #d1d5db;
+        }
+        
+        .btn-outline:hover {
+            background: #f9fafb;
+        }
+        
+        input, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 16px;
+            margin-bottom: 12px;
+            font-family: inherit;
+        }
+        
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #2563eb;
+        }
+        
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+        
+        .entries {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        
+        .entry {
+            padding: 16px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            background: #f9fafb;
+        }
+        
+        .entry-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .entry-date {
+            font-weight: 600;
+            color: #1f2937;
+        }
+        
+        .entry-times {
+            color: #6b7280;
+            margin-bottom: 8px;
+        }
+        
+        .entry-comment {
+            color: #374151;
+            font-style: italic;
+        }
+        
+        .entry-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        
+        .entry-actions button {
+            padding: 8px 12px;
+            font-size: 14px;
+            margin: 0;
+        }
+        
+        .settings-group {
+            margin-bottom: 16px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #374151;
+            font-weight: 500;
+        }
+        
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        input[type="checkbox"] {
+            width: auto;
+            margin: 0;
+        }
+        
+        .tab-buttons {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .tab-buttons button {
+            flex: 1;
+            background: #e5e7eb;
+            color: #374151;
+            margin: 0;
+        }
+        
+        .tab-buttons button.active {
+            background: #2563eb;
+            color: white;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .time-display {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1f2937;
+            margin: 8px 0;
+        }
+        
+        /* Auth styles */
+        .auth-container {
+            max-width: 400px;
+            margin: 60px auto;
+        }
+        
+        .auth-tabs {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        
+        .auth-tabs button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            background: #e5e7eb;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+        }
+        
+        .auth-tabs button.active {
+            background: #2563eb;
+            color: white;
+        }
+        
+        .auth-tabs button:first-child {
+            border-radius: 8px 0 0 8px;
+        }
+        
+        .auth-tabs button:last-child {
+            border-radius: 0 8px 8px 0;
+        }
+        
+        .auth-form {
+            display: none;
+        }
+        
+        .auth-form.active {
+            display: block;
+        }
+        
+        .divider {
+            display: flex;
+            align-items: center;
+            margin: 20px 0;
+            color: #6b7280;
+        }
+        
+        .divider::before,
+        .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: #d1d5db;
+        }
+        
+        .divider span {
+            padding: 0 16px;
+            font-size: 14px;
+        }
+        
+        .btn-github {
+            background: #24292e;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .btn-github:hover {
+            background: #1b1f23;
+        }
+        
+        .error-message {
+            background: #fef2f2;
+            color: #dc2626;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            font-size: 14px;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        /* Modal styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.2s, visibility 0.2s;
+        }
+        
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .modal {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            transform: scale(0.95) translateY(10px);
+            transition: transform 0.2s;
+        }
+        
+        .modal-overlay.active .modal {
+            transform: scale(1) translateY(0);
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .modal-header h2 {
+            margin: 0;
+            font-size: 20px;
+            color: #1f2937;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: #6b7280;
+            cursor: pointer;
+            padding: 4px 8px;
+            margin: 0;
+            width: auto;
+            line-height: 1;
+        }
+        
+        .modal-close:hover {
+            color: #1f2937;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .modal-body {
+            margin-bottom: 20px;
+        }
+        
+        .form-group {
+            margin-bottom: 16px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+            color: #374151;
+            font-size: 14px;
+        }
+        
+        .form-group input,
+        .form-group textarea {
+            margin-bottom: 0;
+        }
+        
+        .time-inputs {
+            display: flex;
+            gap: 12px;
+        }
+        
+        .time-inputs .form-group {
+            flex: 1;
+        }
+        
+        .modal-footer {
+            display: flex;
+            gap: 12px;
+        }
+        
+        .modal-footer button {
+            flex: 1;
+            margin: 0;
+        }
+        
+        .btn-danger {
+            background: #dc2626;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #b91c1c;
+        }
+        
+        /* Calendar widget styles */
+        .calendar-container {
+            margin-bottom: 24px;
+        }
+        
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        
+        .calendar-header h3 {
+            font-size: 18px;
+            color: #1f2937;
+            margin: 0;
+        }
+        
+        .calendar-header button {
+            width: 32px;
+            height: 32px;
+            min-width: 32px;
+            padding: 0;
+            margin: 0;
+            border-radius: 50%;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .calendar-nav {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .calendar-nav button {
+            width: 36px;
+            height: 36px;
+            padding: 0;
+            margin: 0;
+            border-radius: 50%;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 4px;
+        }
+        
+        .calendar-day-header {
+            text-align: center;
+            font-weight: 600;
+            font-size: 12px;
+            color: #6b7280;
+            padding: 8px 4px;
+        }
+        
+        .calendar-day {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            font-size: 14px;
+            color: #374151;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        
+        .calendar-day:hover {
+            background: #f3f4f6;
+        }
+        
+        .calendar-day.other-month {
+            color: #d1d5db;
+        }
+        
+        .calendar-day.today {
+            border: 2px solid #2563eb;
+            font-weight: 600;
+        }
+        
+        .calendar-day.worked {
+            background: #dbeafe;
+            color: #1e40af;
+            font-weight: 600;
+        }
+        
+        .calendar-day.worked.today {
+            background: #2563eb;
+            color: white;
+        }
+        
+        .calendar-day.selected {
+            background: #2563eb;
+            color: white;
+        }
+        
+        .calendar-legend {
+            display: flex;
+            gap: 16px;
+            margin-top: 12px;
+            font-size: 12px;
+            color: #6b7280;
+        }
+        
+        .calendar-legend span {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+        
+        .legend-dot.worked {
+            background: #dbeafe;
+            border: 1px solid #93c5fd;
+        }
+        
+        .legend-dot.today {
+            border: 2px solid #2563eb;
+        }
+        
+        /* Flatpickr positioning fix for modal */
+        .flatpickr-calendar {
+            z-index: 10001 !important;
+        }
+        
+        .flatpickr-calendar.static {
+            position: absolute !important;
+        }
+        
+        .flatpickr-calendar.static.open {
+            display: block;
+        }
+        
+        /* Flatpickr time picker customization */
+        .flatpickr-time {
+            max-height: none !important;
+        }
+        
+        .flatpickr-calendar.hasTime .flatpickr-time {
+            border-top: 1px solid #e5e7eb;
+        }
+        
+        .time-picker-wrapper {
+            position: relative;
+        }
+        
+        .time-picker-wrapper input {
+            cursor: pointer;
+        }
+        
+        .time-picker-wrapper::after {
+            content: '🕐';
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            pointer-events: none;
+        }
+        
+        /* Modal positioning context for flatpickr */
+        .modal {
+            position: relative;
+        }
+        
+        .modal .form-group {
+            position: relative;
+        }
+    </style>
+</head>
+<body>
+    <!-- Auth Section (shown when logged out) -->
+    <div id="auth-section" class="auth-container hidden">
+        <div class="container">
+            <h1 style="text-align: center;">⏰ Time Tracker</h1>
+            
+            <div id="auth-error" class="error-message hidden"></div>
+            
+            <div class="auth-tabs">
+                <button class="active" onclick="showAuthTab('login')">Login</button>
+                <button onclick="showAuthTab('register')">Register</button>
+            </div>
+            
+            <div id="login-form" class="auth-form active">
+                <input type="text" id="login-username" placeholder="Username" autocomplete="username">
+                <input type="password" id="login-password" placeholder="Password" autocomplete="current-password">
+                <button class="btn-primary" onclick="login()">Login</button>
+            </div>
+            
+            <div id="register-form" class="auth-form">
+                <input type="text" id="register-username" placeholder="Username (min 3 characters)" autocomplete="username">
+                <input type="password" id="register-password" placeholder="Password (min 6 characters)" autocomplete="new-password">
+                <button class="btn-primary" onclick="register()">Create Account</button>
+            </div>
+            
+            <div id="github-section" class="hidden">
+                <div class="divider"><span>or</span></div>
+                <button class="btn-github" onclick="window.location='/auth/github'">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                    </svg>
+                    Continue with GitHub
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App Section (shown when logged in) -->
+    <div id="app-section" class="hidden">
+        <div class="container">
+            <div class="header">
+                <h1>⏰ Time Tracker</h1>
+                <div class="user-info">
+                    <img id="user-avatar" src="" alt="" class="hidden">
+                    <span id="user-name"></span>
+                    <button class="btn-outline btn-logout" onclick="logout()">Logout</button>
+                </div>
+            </div>
+            
+            <div id="status" class="status"></div>
+            
+            <div class="tab-buttons">
+                <button class="active" onclick="switchTab('clock')">Clock In/Out</button>
+                <button onclick="switchTab('history')">History</button>
+                <button onclick="switchTab('settings')">Settings</button>
+            </div>
+        
+        <div id="clock-tab" class="tab-content active">
+            <div id="clock-in-section">
+                <button class="btn-primary" onclick="clockIn()">Clock In</button>
+            </div>
+            
+            <div id="clock-out-section" style="display: none;">
+                <div class="time-display">Clocked in at: <span id="check-in-time"></span></div>
+                <textarea id="comment" placeholder="What did you work on today? (optional)"></textarea>
+                <button class="btn-secondary" onclick="clockOut()">Clock Out</button>
+            </div>
+        </div>
+        
+        <div id="history-tab" class="tab-content">
+            <!-- Calendar Widget -->
+            <div class="calendar-container">
+                <div class="calendar-header">
+                    <button class="btn-outline" onclick="prevMonth()">←</button>
+                    <h3 id="calendar-month-year"></h3>
+                    <button class="btn-outline" onclick="nextMonth()">→</button>
+                </div>
+                <div class="calendar-grid" id="calendar-grid">
+                    <div class="calendar-day-header">Mon</div>
+                    <div class="calendar-day-header">Tue</div>
+                    <div class="calendar-day-header">Wed</div>
+                    <div class="calendar-day-header">Thu</div>
+                    <div class="calendar-day-header">Fri</div>
+                    <div class="calendar-day-header">Sat</div>
+                    <div class="calendar-day-header">Sun</div>
+                </div>
+                <div class="calendar-legend">
+                    <span><div class="legend-dot worked"></div> Worked</span>
+                    <span><div class="legend-dot today"></div> Today</span>
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+                <button class="btn-outline" onclick="exportExcel()">📥 Export to Excel</button>
+            </div>
+            <div id="entries" class="entries"></div>
+        </div>
+        
+        <div id="settings-tab" class="tab-content">
+            <div class="settings-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="reminder-enabled" checked>
+                    Enable check-out reminders
+                </label>
+            </div>
+            
+            <div class="settings-group">
+                <label for="reminder-time">Reminder time (24h format)</label>
+                <input type="time" id="reminder-time" value="20:00">
+            </div>
+            
+            <button class="btn-primary" onclick="saveSettings()">Save Settings</button>
+            
+            <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #e5e7eb;">
+                <h3 style="margin-bottom: 12px; color: #374151;">Push Notifications</h3>
+                <p style="color: #6b7280; margin-bottom: 12px; font-size: 14px;">
+                    Enable push notifications to receive reminders even when the app is closed.
+                </p>
+                <button class="btn-outline" onclick="subscribeToPush()">Enable Notifications</button>
+            </div>
+        </div>
+    </div>
+    </div>
+    
+    <!-- Edit Entry Modal -->
+    <div id="edit-modal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Edit Entry</h2>
+                <button class="modal-close" onclick="closeEditModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="edit-entry-id">
+                <div class="form-group">
+                    <label>Date</label>
+                    <input type="text" id="edit-date" placeholder="Select date">
+                </div>
+                <div class="time-inputs">
+                    <div class="form-group">
+                        <label>Check In</label>
+                        <div class="time-picker-wrapper">
+                            <input type="text" id="edit-check-in" placeholder="Select time" readonly>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Check Out</label>
+                        <div class="time-picker-wrapper">
+                            <input type="text" id="edit-check-out" placeholder="Select time" readonly>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Comment</label>
+                    <textarea id="edit-comment" placeholder="Optional comment..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-outline" onclick="closeEditModal()">Cancel</button>
+                <button class="btn-primary" onclick="saveEntry()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let currentStatus = null;
+        let currentUser = null;
+        let calendarDate = new Date();
+        let workedDates = new Set();
+        let checkInPicker, checkOutPicker, datePicker;
+        
+        // Initialize Flatpickr time pickers
+        function initTimePickers() {
+            const modalBody = document.querySelector('.modal-body');
+            
+            const timeConfig = {
+                enableTime: true,
+                noCalendar: true,
+                dateFormat: "H:i",
+                time_24hr: true,
+                minuteIncrement: 5,
+                allowInput: false,
+                static: true,
+                appendTo: modalBody,
+                positionElement: null,
+                position: "below"
+            };
+            
+            checkInPicker = flatpickr("#edit-check-in", timeConfig);
+            checkOutPicker = flatpickr("#edit-check-out", timeConfig);
+            datePicker = flatpickr("#edit-date", {
+                dateFormat: "Y-m-d",
+                allowInput: false,
+                static: true,
+                appendTo: modalBody,
+                position: "below"
+            });
+        }
+        
+        // Calendar functions
+        function renderCalendar() {
+            const year = calendarDate.getFullYear();
+            const month = calendarDate.getMonth();
+            
+            // Update header
+            const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                               'July', 'August', 'September', 'October', 'November', 'December'];
+            document.getElementById('calendar-month-year').textContent = `${monthNames[month]} ${year}`;
+            
+            // Get first day of month and total days
+            const firstDay = new Date(year, month, 1);
+            const lastDay = new Date(year, month + 1, 0);
+            const totalDays = lastDay.getDate();
+            
+            // Get the day of week for first day (Monday = 0)
+            let startDay = firstDay.getDay() - 1;
+            if (startDay < 0) startDay = 6;
+            
+            // Build calendar days HTML
+            let html = '';
+            const today = new Date();
+            const todayStr = today.toISOString().split('T')[0];
+            
+            // Previous month days
+            const prevMonthLastDay = new Date(year, month, 0).getDate();
+            for (let i = startDay - 1; i >= 0; i--) {
+                const day = prevMonthLastDay - i;
+                html += `<div class="calendar-day other-month">${day}</div>`;
+            }
+            
+            // Current month days
+            for (let day = 1; day <= totalDays; day++) {
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const isToday = dateStr === todayStr;
+                const isWorked = workedDates.has(dateStr);
+                
+                let classes = 'calendar-day';
+                if (isToday) classes += ' today';
+                if (isWorked) classes += ' worked';
+                
+                html += `<div class="${classes}" onclick="filterByDate('${dateStr}')">${day}</div>`;
+            }
+            
+            // Next month days to fill the grid
+            const totalCells = Math.ceil((startDay + totalDays) / 7) * 7;
+            const nextMonthDays = totalCells - startDay - totalDays;
+            for (let day = 1; day <= nextMonthDays; day++) {
+                html += `<div class="calendar-day other-month">${day}</div>`;
+            }
+            
+            // Update the calendar grid - remove old days first, keep headers
+            const grid = document.getElementById('calendar-grid');
+            const oldDays = grid.querySelectorAll('.calendar-day');
+            oldDays.forEach(day => day.remove());
+            grid.insertAdjacentHTML('beforeend', html);
+        }
+        
+        function prevMonth() {
+            calendarDate.setMonth(calendarDate.getMonth() - 1);
+            loadCalendarData();
+        }
+        
+        function nextMonth() {
+            calendarDate.setMonth(calendarDate.getMonth() + 1);
+            loadCalendarData();
+        }
+        
+        async function loadCalendarData() {
+            try {
+                const res = await fetch('/api/entries');
+                const entries = await res.json();
+                
+                workedDates.clear();
+                entries.forEach(entry => {
+                    if (entry.date) {
+                        workedDates.add(entry.date);
+                    }
+                });
+                
+                renderCalendar();
+            } catch (err) {
+                console.error('Failed to load calendar data:', err);
+                renderCalendar();
+            }
+        }
+        
+        function filterByDate(dateStr) {
+            // Scroll to the entry for this date if exists
+            const entries = document.querySelectorAll('.entry');
+            for (const entry of entries) {
+                const dateEl = entry.querySelector('.entry-date');
+                if (dateEl && dateEl.textContent === dateStr) {
+                    entry.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    entry.style.boxShadow = '0 0 0 3px #2563eb';
+                    setTimeout(() => {
+                        entry.style.boxShadow = '';
+                    }, 2000);
+                    return;
+                }
+            }
+        }
+        
+        // Check authentication on page load
+        async function checkAuth() {
+            try {
+                const [userRes, providersRes] = await Promise.all([
+                    fetch('/api/user'),
+                    fetch('/api/auth/providers')
+                ]);
+                
+                currentUser = await userRes.json();
+                const providers = await providersRes.json();
+                
+                // Show/hide GitHub button based on server config
+                if (providers.github) {
+                    document.getElementById('github-section').classList.remove('hidden');
+                }
+                
+                if (currentUser) {
+                    showApp();
+                } else {
+                    showAuth();
+                }
+            } catch (err) {
+                console.error('Auth check failed:', err);
+                showAuth();
+            }
+        }
+        
+        function showAuth() {
+            document.getElementById('auth-section').classList.remove('hidden');
+            document.getElementById('app-section').classList.add('hidden');
+        }
+        
+        function showApp() {
+            document.getElementById('auth-section').classList.add('hidden');
+            document.getElementById('app-section').classList.remove('hidden');
+            
+            // Update user info display
+            document.getElementById('user-name').textContent = currentUser.username;
+            if (currentUser.avatar_url) {
+                const avatar = document.getElementById('user-avatar');
+                avatar.src = currentUser.avatar_url;
+                avatar.classList.remove('hidden');
+            }
+            
+            // Initialize time pickers
+            initTimePickers();
+            
+            // Load calendar data
+            loadCalendarData();
+            
+            loadStatus();
+        }
+        
+        function showAuthTab(tab) {
+            document.querySelectorAll('.auth-tabs button').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.auth-form').forEach(form => form.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(`${tab}-form`).classList.add('active');
+            document.getElementById('auth-error').classList.add('hidden');
+        }
+        
+        function showAuthError(message) {
+            const errorEl = document.getElementById('auth-error');
+            errorEl.textContent = message;
+            errorEl.classList.remove('hidden');
+        }
+        
+        async function login() {
+            const username = document.getElementById('login-username').value;
+            const password = document.getElementById('login-password').value;
+            
+            if (!username || !password) {
+                showAuthError('Please enter username and password');
+                return;
+            }
+            
+            try {
+                const res = await fetch('/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await res.json();
+                
+                if (data.error) {
+                    showAuthError(data.error);
+                } else {
+                    currentUser = data.user;
+                    showApp();
+                }
+            } catch (err) {
+                showAuthError('Login failed: ' + err.message);
+            }
+        }
+        
+        async function register() {
+            const username = document.getElementById('register-username').value;
+            const password = document.getElementById('register-password').value;
+            
+            if (!username || !password) {
+                showAuthError('Please enter username and password');
+                return;
+            }
+            
+            try {
+                const res = await fetch('/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await res.json();
+                
+                if (data.error) {
+                    showAuthError(data.error);
+                } else {
+                    currentUser = data.user;
+                    showApp();
+                }
+            } catch (err) {
+                showAuthError('Registration failed: ' + err.message);
+            }
+        }
+        
+        async function logout() {
+            try {
+                await fetch('/auth/logout', { method: 'POST' });
+                currentUser = null;
+                showAuth();
+            } catch (err) {
+                console.error('Logout failed:', err);
+            }
+        }
+        
+        async function loadStatus() {
+            try {
+                const res = await fetch('/api/status');
+                if (res.status === 401) {
+                    showAuth();
+                    return;
+                }
+                currentStatus = await res.json();
+                updateUI();
+            } catch (err) {
+                console.error('Failed to load status:', err);
+            }
+        }
+        
+        function updateUI() {
+            const statusEl = document.getElementById('status');
+            const clockInSection = document.getElementById('clock-in-section');
+            const clockOutSection = document.getElementById('clock-out-section');
+            
+            if (!currentStatus.hasEntry || currentStatus.checkedOut) {
+                statusEl.className = 'status';
+                statusEl.textContent = 'Ready to clock in';
+                clockInSection.style.display = 'block';
+                clockOutSection.style.display = 'none';
+            } else if (currentStatus.checkedIn) {
+                const entry = currentStatus.entry;
+                const checkInTime = entry.check_in;
+                
+                // Check if it's been a long time
+                const now = new Date();
+                const [h, m] = checkInTime.split(':').map(Number);
+                const checkInDate = new Date();
+                checkInDate.setHours(h, m, 0);
+                const hoursSince = (now - checkInDate) / (1000 * 60 * 60);
+                
+                if (hoursSince > 10) {
+                    statusEl.className = 'status warning';
+                    statusEl.textContent = `⚠️ You've been clocked in since ${checkInTime}. Did you forget to clock out?`;
+                } else {
+                    statusEl.className = 'status checked-in';
+                    statusEl.textContent = `Currently clocked in (since ${checkInTime})`;
+                }
+                
+                document.getElementById('check-in-time').textContent = checkInTime;
+                clockInSection.style.display = 'none';
+                clockOutSection.style.display = 'block';
+            }
+        }
+        
+        async function clockIn() {
+            try {
+                const res = await fetch('/api/clock-in', { method: 'POST' });
+                const data = await res.json();
+                if (data.error) {
+                    alert(data.error);
+                } else {
+                    await loadStatus();
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
+        
+        async function clockOut() {
+            const comment = document.getElementById('comment').value;
+            try {
+                const res = await fetch('/api/clock-out', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ comment })
+                });
+                const data = await res.json();
+                if (data.error) {
+                    alert(data.error);
+                } else {
+                    document.getElementById('comment').value = '';
+                    await loadStatus();
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
+        
+        async function loadEntries() {
+            const res = await fetch('/api/entries');
+            const entries = await res.json();
+            
+            // Update worked dates for calendar
+            workedDates.clear();
+            entries.forEach(entry => {
+                if (entry.date) {
+                    workedDates.add(entry.date);
+                }
+            });
+            renderCalendar();
+            
+            const entriesEl = document.getElementById('entries');
+            entriesEl.innerHTML = entries.map(entry => {
+                let total = '';
+                if (entry.check_in && entry.check_out) {
+                    const [inH, inM] = entry.check_in.split(':').map(Number);
+                    const [outH, outM] = entry.check_out.split(':').map(Number);
+                    const totalMinutes = (outH * 60 + outM) - (inH * 60 + inM);
+                    const hours = Math.floor(totalMinutes / 60);
+                    const minutes = totalMinutes % 60;
+                    total = `${hours}h ${minutes}m`;
+                }
+                
+                return `
+                    <div class="entry">
+                        <div class="entry-header">
+                            <span class="entry-date">${entry.date}</span>
+                            <span style="color: #6b7280;">${total}</span>
+                        </div>
+                        <div class="entry-times">
+                            ${entry.check_in || '--:--'} → ${entry.check_out || '--:--'}
+                        </div>
+                        ${entry.comment ? `<div class="entry-comment">${entry.comment}</div>` : ''}
+                        <div class="entry-actions">
+                            <button class="btn-outline" onclick="editEntry(${entry.id})">Edit</button>
+                            <button class="btn-outline" onclick="deleteEntry(${entry.id})">Delete</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        async function exportExcel() {
+            window.location.href = '/api/export';
+        }
+        
+        async function deleteEntry(id) {
+            if (!confirm('Delete this entry?')) return;
+            await fetch(`/api/entries/${id}`, { method: 'DELETE' });
+            await loadEntries();
+        }
+        
+        async function editEntry(id) {
+            const res = await fetch('/api/entries');
+            const entries = await res.json();
+            const entry = entries.find(e => e.id === id);
+            
+            if (!entry) return;
+            
+            // Populate the modal with entry data using Flatpickr
+            document.getElementById('edit-entry-id').value = id;
+            datePicker.setDate(entry.date, true);
+            
+            if (entry.check_in) {
+                checkInPicker.setDate(entry.check_in, true);
+            } else {
+                checkInPicker.clear();
+            }
+            
+            if (entry.check_out) {
+                checkOutPicker.setDate(entry.check_out, true);
+            } else {
+                checkOutPicker.clear();
+            }
+            
+            document.getElementById('edit-comment').value = entry.comment || '';
+            
+            // Show the modal
+            document.getElementById('edit-modal').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+        
+        function closeEditModal() {
+            document.getElementById('edit-modal').classList.remove('active');
+            document.body.style.overflow = '';
+        }
+        
+        async function saveEntry() {
+            const id = document.getElementById('edit-entry-id').value;
+            const date = document.getElementById('edit-date').value;
+            const checkIn = document.getElementById('edit-check-in').value;
+            const checkOut = document.getElementById('edit-check-out').value;
+            const comment = document.getElementById('edit-comment').value;
+            
+            try {
+                await fetch(`/api/entries/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        date,
+                        check_in: checkIn, 
+                        check_out: checkOut, 
+                        comment 
+                    })
+                });
+                closeEditModal();
+                await loadEntries();
+            } catch (err) {
+                alert('Error saving entry: ' + err.message);
+            }
+        }
+        
+        // Close modal when clicking outside
+        document.getElementById('edit-modal').addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal-overlay')) {
+                closeEditModal();
+            }
+        });
+        
+        // Close modal on Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && document.getElementById('edit-modal').classList.contains('active')) {
+                closeEditModal();
+            }
+        });
+        
+        async function loadSettings() {
+            const res = await fetch('/api/settings');
+            const settings = await res.json();
+            
+            document.getElementById('reminder-time').value = settings.reminderTime;
+            document.getElementById('reminder-enabled').checked = settings.reminderEnabled;
+        }
+        
+        async function saveSettings() {
+            const reminderTime = document.getElementById('reminder-time').value;
+            const reminderEnabled = document.getElementById('reminder-enabled').checked;
+            
+            await fetch('/api/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reminderTime, reminderEnabled })
+            });
+            
+            alert('Settings saved!');
+        }
+        
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-buttons button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            event.target.classList.add('active');
+            document.getElementById(`${tab}-tab`).classList.add('active');
+            
+            if (tab === 'history') {
+                loadEntries();
+            } else if (tab === 'settings') {
+                loadSettings();
+            }
+        }
+        
+        async function subscribeToPush() {
+            if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+                alert('Push notifications are not supported in this browser');
+                return;
+            }
+            
+            try {
+                const registration = await navigator.serviceWorker.register('/sw.js');
+                await navigator.serviceWorker.ready;
+                
+                const permission = await Notification.requestPermission();
+                if (permission !== 'granted') {
+                    alert('Notification permission denied');
+                    return;
+                }
+                
+                const res = await fetch('/api/vapid-public-key');
+                const { publicKey } = await res.json();
+                
+                const subscription = await registration.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: urlBase64ToUint8Array(publicKey)
+                });
+                
+                await fetch('/api/subscribe', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(subscription)
+                });
+                
+                alert('Push notifications enabled!');
+            } catch (err) {
+                alert('Error enabling notifications: ' + err.message);
+            }
+        }
+        
+        function urlBase64ToUint8Array(base64String) {
+            const padding = '='.repeat((4 - base64String.length % 4) % 4);
+            const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+            const rawData = window.atob(base64);
+            const outputArray = new Uint8Array(rawData.length);
+            for (let i = 0; i < rawData.length; ++i) {
+                outputArray[i] = rawData.charCodeAt(i);
+            }
+            return outputArray;
+        }
+        
+        // Register service worker
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js');
+        }
+        
+        // Check auth and load initial status
+        checkAuth();
+        
+        // Refresh status every minute (only when logged in)
+        setInterval(() => {
+            if (currentUser) {
+                loadStatus();
+            }
+        }, 60000);
+        
+        // Handle enter key on login/register forms
+        document.getElementById('login-password').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') login();
+        });
+        document.getElementById('register-password').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') register();
+        });
+        
+        // Check for OAuth error in URL
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('error') === 'github_auth_failed') {
+            showAuthError('GitHub authentication failed. Please try again.');
+            window.history.replaceState({}, document.title, '/');
+        }
+    </script>
+</body>
+</html>

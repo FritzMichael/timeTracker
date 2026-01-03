@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  timetracker:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=development
+    restart: unless-stopped
