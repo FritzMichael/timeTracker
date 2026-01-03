@@ -10,9 +10,11 @@ const bcrypt = require('bcryptjs');
 const Database = require('better-sqlite3');
 const ExcelJS = require('exceljs');
 const webpush = require('web-push');
-const nodemailer = require('nodemailer');
 const path = require('path');
 const fs = require('fs');
+
+// Load modules
+const EmailReports = require('./lib/emailReports');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -199,30 +201,8 @@ webpush.setVapidDetails(
   vapidPrivateKey
 );
 
-// Email configuration (optional - only if SMTP/Resend is configured)
-const emailEnabled = process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS;
-let emailTransporter = null;
-
-if (emailEnabled) {
-  emailTransporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT) || 465,
-    secure: process.env.SMTP_PORT === '465' || parseInt(process.env.SMTP_PORT) === 465,
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS
-    }
-  });
-  
-  // Verify connection on startup
-  emailTransporter.verify((error) => {
-    if (error) {
-      console.error('❌ SMTP connection error:', error.message);
-    } else {
-      console.log('✅ SMTP server ready to send emails');
-    }
-  });
-}
+// Initialize email reports module
+const emailReports = new EmailReports(db);
 
 // Auth middleware
 function requireAuth(req, res, next) {
@@ -620,197 +600,10 @@ app.post('/api/subscribe', requireAuth, (req, res) => {
 
 // ============ MONTHLY EMAIL REPORTS ============
 
-// Generate Excel report for a specific user and month
-async function generateMonthlyReport(userId, year, month) {
-  const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
-  const endDate = `${year}-${String(month).padStart(2, '0')}-31`;
-  
-  const stmt = db.prepare(`
-    SELECT * FROM entries 
-    WHERE user_id = ? AND date >= ? AND date <= ? 
-    ORDER BY date ASC
-  `);
-  const entries = stmt.all(userId, startDate, endDate);
-  
-  if (entries.length === 0) {
-    return null; // No entries for this month
-  }
-  
-  const workbook = new ExcelJS.Workbook();
-  const worksheet = workbook.addWorksheet('Time Tracking');
-  
-  // Add title
-  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
-                      'July', 'August', 'September', 'October', 'November', 'December'];
-  worksheet.mergeCells('A1:E1');
-  worksheet.getCell('A1').value = `Time Tracking Report - ${monthNames[month - 1]} ${year}`;
-  worksheet.getCell('A1').font = { bold: true, size: 14 };
-  worksheet.addRow([]);
-  
-  // Add headers
-  const headerRow = worksheet.addRow(['Date', 'Check In', 'Check Out', 'Total Hours', 'Comment']);
-  headerRow.font = { bold: true };
-  
-  worksheet.columns = [
-    { key: 'date', width: 12 },
-    { key: 'check_in', width: 12 },
-    { key: 'check_out', width: 12 },
-    { key: 'total', width: 12 },
-    { key: 'comment', width: 40 }
-  ];
-  
-  let totalMinutesMonth = 0;
-  
-  entries.forEach(entry => {
-    let total = '';
-    let minutes = 0;
-    if (entry.check_in && entry.check_out) {
-      const [inH, inM] = entry.check_in.split(':').map(Number);
-      const [outH, outM] = entry.check_out.split(':').map(Number);
-      minutes = (outH * 60 + outM) - (inH * 60 + inM);
-      totalMinutesMonth += minutes;
-      const hours = Math.floor(minutes / 60);
-      const mins = minutes % 60;
-      total = `${hours}:${mins.toString().padStart(2, '0')}`;
-    }
-    
-    worksheet.addRow([
-      entry.date,
-      entry.check_in || '',
-      entry.check_out || '',
-      total,
-      entry.comment || ''
-    ]);
-  });
-  
-  // Add summary row
-  worksheet.addRow([]);
-  const totalHours = Math.floor(totalMinutesMonth / 60);
-  const totalMins = totalMinutesMonth % 60;
-  const summaryRow = worksheet.addRow(['TOTAL', '', '', `${totalHours}:${totalMins.toString().padStart(2, '0')}`, '']);
-  summaryRow.font = { bold: true };
-  
-  // Generate buffer
-  const buffer = await workbook.xlsx.writeBuffer();
-  return buffer;
-}
-
-// Send monthly report email to a user
-async function sendMonthlyReportEmail(user, year, month) {
-  if (!emailEnabled || !emailTransporter) {
-    console.log(`📧 Email not configured, skipping report for user ${user.username}`);
-    return false;
-  }
-  
-  if (!user.email) {
-    console.log(`📧 No email address for user ${user.username}, skipping report`);
-    return false;
-  }
-  
-  try {
-    const reportBuffer = await generateMonthlyReport(user.id, year, month);
-    
-    if (!reportBuffer) {
-      console.log(`📧 No entries for user ${user.username} in ${year}-${month}, skipping`);
-      return false;
-    }
-    
-    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
-                        'July', 'August', 'September', 'October', 'November', 'December'];
-    const monthName = monthNames[month - 1];
-    
-    await emailTransporter.sendMail({
-      from: process.env.SMTP_FROM || process.env.SMTP_USER,
-      to: user.email,
-      subject: `Time Tracking Report - ${monthName} ${year}`,
-      html: `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #1f2937;">Your Monthly Time Tracking Report</h2>
-          <p>Hi ${user.username},</p>
-          <p>Please find attached your time tracking report for <strong>${monthName} ${year}</strong>.</p>
-          <p style="color: #6b7280; font-size: 14px; margin-top: 32px;">
-            Best regards,<br>
-            Time Tracker
-          </p>
-        </div>
-      `,
-      attachments: [
-        {
-          filename: `time-tracking-${year}-${String(month).padStart(2, '0')}.xlsx`,
-          content: reportBuffer,
-          contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        }
-      ]
-    });
-    
-    console.log(`📧 Monthly report sent to ${user.email}`);
-    return true;
-  } catch (err) {
-    console.error(`📧 Failed to send report to ${user.email}:`, err.message);
-    return false;
-  }
-}
-
-// Send monthly reports to all active users
-async function sendAllMonthlyReports() {
-  const now = new Date();
-  // Get previous month
-  let year = now.getFullYear();
-  let month = now.getMonth(); // 0-indexed, so this is already "previous month"
-  
-  if (month === 0) {
-    month = 12;
-    year -= 1;
-  }
-  
-  console.log(`📧 Generating monthly reports for ${year}-${String(month).padStart(2, '0')}...`);
-  
-  // Find all users who have entries in the previous month
-  const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
-  const endDate = `${year}-${String(month).padStart(2, '0')}-31`;
-  
-  const usersWithActivity = db.prepare(`
-    SELECT DISTINCT u.id, u.username, u.email
-    FROM users u
-    INNER JOIN entries e ON u.id = e.user_id
-    WHERE e.date >= ? AND e.date <= ?
-  `).all(startDate, endDate);
-  
-  console.log(`📧 Found ${usersWithActivity.length} users with activity`);
-  
-  let sent = 0;
-  let skipped = 0;
-  
-  for (const user of usersWithActivity) {
-    const success = await sendMonthlyReportEmail(user, year, month);
-    if (success) {
-      sent++;
-    } else {
-      skipped++;
-    }
-  }
-  
-  console.log(`📧 Monthly reports complete: ${sent} sent, ${skipped} skipped`);
-  return { sent, skipped };
-}
-
-// Check if it's time to send monthly reports (1st of month at 8:00 AM)
-function checkMonthlyReports() {
-  const now = new Date();
-  const day = now.getDate();
-  const hours = now.getHours();
-  const minutes = now.getMinutes();
-  
-  // Run on the 1st of each month at 08:00
-  if (day === 1 && hours === 8 && minutes === 0) {
-    sendAllMonthlyReports();
-  }
-}
-
 // Manual trigger endpoint for sending monthly reports
 app.post('/api/admin/send-monthly-reports', requireAuth, async (req, res) => {
   try {
-    const result = await sendAllMonthlyReports();
+    const result = await emailReports.sendAllMonthlyReports();
     res.json({ success: true, ...result });
   } catch (err) {
     console.error('Error sending monthly reports:', err);
@@ -832,7 +625,7 @@ app.post('/api/admin/send-report/:userId', requireAuth, async (req, res) => {
     const reportYear = year || new Date().getFullYear();
     const reportMonth = month || new Date().getMonth() || 12;
     
-    const success = await sendMonthlyReportEmail(user, reportYear, reportMonth);
+    const success = await emailReports.sendReportToUser(user, reportYear, reportMonth);
     res.json({ success, user: user.username, email: user.email });
   } catch (err) {
     console.error('Error sending report:', err);
@@ -892,8 +685,8 @@ function checkReminders() {
 
 setInterval(checkReminders, 60000);
 
-// Check for monthly reports every minute
-setInterval(checkMonthlyReports, 60000);
+// Start the monthly report scheduler
+emailReports.startScheduler();
 
 // Development helper: Icon generator
 app.get('/generate-icons', (req, res) => {
@@ -903,6 +696,6 @@ app.get('/generate-icons', (req, res) => {
 app.listen(PORT, () => {
   console.log(`\n🕐 Time Tracker running on http://localhost:${PORT}`);
   console.log(`   GitHub OAuth: ${githubEnabled ? '✅ Enabled' : '❌ Disabled (set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET to enable)'}`);
-  console.log(`   Monthly Reports: ${emailEnabled ? '✅ Enabled (via ' + process.env.SMTP_HOST + ')' : '❌ Disabled (set SMTP_* variables to enable)'}`);
+  console.log(`   Monthly Reports: ${emailReports.isEnabled() ? '✅ Enabled (via ' + process.env.SMTP_HOST + ')' : '❌ Disabled (set SMTP_* variables to enable)'}`);
   console.log(`\n⚠  PWA Setup: Visit http://localhost:${PORT}/generate-icons to create icon files`);
 });
