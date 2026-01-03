@@ -1,7 +1,7 @@
 {
   "name": "time-tracker",
-  "version": "2.0.0",
-  "description": "Multi-user time tracking with Excel export",
+  "version": "2.1.0",
+  "description": "Multi-user time tracking with Excel export and monthly email reports",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -17,6 +17,7 @@
     "passport-local": "^1.0.0",
     "passport-github2": "^0.1.12",
     "bcryptjs": "^2.4.3",
-    "dotenv": "^16.3.1"
+    "dotenv": "^16.3.1",
+    "nodemailer": "^6.9.8"
   }
 }
