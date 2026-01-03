@@ -889,6 +889,41 @@
         </div>
     </div>
     
+    <!-- Export Modal -->
+    <div id="export-modal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Export to Excel</h2>
+                <button class="modal-close" onclick="closeExportModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="color: #6b7280; margin-bottom: 16px;">Select the month range to export:</p>
+                <div class="time-inputs">
+                    <div class="form-group">
+                        <label>From</label>
+                        <input type="month" id="export-start-month">
+                    </div>
+                    <div class="form-group">
+                        <label>To</label>
+                        <input type="month" id="export-end-month">
+                    </div>
+                </div>
+                <div style="margin-top: 8px;">
+                    <button class="btn-outline" onclick="setExportRangeAll()" style="font-size: 13px; padding: 6px 12px;">
+                        📅 All Time
+                    </button>
+                    <button class="btn-outline" onclick="setExportRangeThisYear()" style="font-size: 13px; padding: 6px 12px; margin-left: 8px;">
+                        📆 This Year
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-outline" onclick="closeExportModal()">Cancel</button>
+                <button class="btn-primary" onclick="doExport()">📥 Export</button>
+            </div>
+        </div>
+    </div>
+    
     <script>
         let currentStatus = null;
         let currentUser = null;
@@ -1332,10 +1367,65 @@
             }).join('');
         }
         
-        async function exportExcel() {
-            window.location.href = '/api/export';
+        // Export modal functions
+        function exportExcel() {
+            const modal = document.getElementById('export-modal');
+            modal.classList.add('active');
+            
+            // Set default to current month
+            const now = new Date();
+            const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            document.getElementById('export-start-month').value = currentMonth;
+            document.getElementById('export-end-month').value = currentMonth;
         }
         
+        function closeExportModal() {
+            document.getElementById('export-modal').classList.remove('active');
+        }
+        
+        function setExportRangeAll() {
+            // Set to a very old date and current date
+            const now = new Date();
+            document.getElementById('export-start-month').value = '2020-01';
+            document.getElementById('export-end-month').value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        }
+        
+        function setExportRangeThisYear() {
+            const now = new Date();
+            const year = now.getFullYear();
+            document.getElementById('export-start-month').value = `${year}-01`;
+            document.getElementById('export-end-month').value = `${year}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        }
+        
+        function doExport() {
+            const startMonth = document.getElementById('export-start-month').value;
+            const endMonth = document.getElementById('export-end-month').value;
+            
+            if (!startMonth || !endMonth) {
+                alert('Please select both start and end months');
+                return;
+            }
+            
+            const [startYear, startM] = startMonth.split('-');
+            const [endYear, endM] = endMonth.split('-');
+            
+            // Validate range
+            if (new Date(endMonth) < new Date(startMonth)) {
+                alert('End month cannot be before start month');
+                return;
+            }
+            
+            const params = new URLSearchParams({
+                startYear,
+                startMonth: startM,
+                endYear,
+                endMonth: endM
+            });
+            
+            window.location.href = `/api/export?${params.toString()}`;
+            closeExportModal();
+        }
+
         async function deleteEntry(id) {
             if (!confirm('Delete this entry?')) return;
             await fetch(`/api/entries/${id}`, { method: 'DELETE' });

@@ -8,13 +8,13 @@ const LocalStrategy = require('passport-local').Strategy;
 const GitHubStrategy = require('passport-github2').Strategy;
 const bcrypt = require('bcryptjs');
 const Database = require('better-sqlite3');
-const ExcelJS = require('exceljs');
 const webpush = require('web-push');
 const path = require('path');
 const fs = require('fs');
 
 // Load modules
 const EmailReports = require('./lib/emailReports');
+const ExcelReport = require('./lib/excelReport');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -517,46 +517,48 @@ app.delete('/api/entries/:id', requireAuth, (req, res) => {
   res.json({ success: true });
 });
 
+// Initialize Excel report module
+const excelReport = new ExcelReport(db);
+
 app.get('/api/export', requireAuth, async (req, res) => {
-  const stmt = db.prepare('SELECT * FROM entries WHERE user_id = ? ORDER BY date ASC');
-  const entries = stmt.all(req.user.id);
-  
-  const workbook = new ExcelJS.Workbook();
-  const worksheet = workbook.addWorksheet('Time Tracking');
-  
-  worksheet.columns = [
-    { header: 'Date', key: 'date', width: 12 },
-    { header: 'Check In', key: 'check_in', width: 12 },
-    { header: 'Check Out', key: 'check_out', width: 12 },
-    { header: 'Total Hours', key: 'total', width: 12 },
-    { header: 'Comment', key: 'comment', width: 40 }
-  ];
-  
-  entries.forEach(entry => {
-    let total = '';
-    if (entry.check_in && entry.check_out) {
-      const [inH, inM] = entry.check_in.split(':').map(Number);
-      const [outH, outM] = entry.check_out.split(':').map(Number);
-      const totalMinutes = (outH * 60 + outM) - (inH * 60 + inM);
-      const hours = Math.floor(totalMinutes / 60);
-      const minutes = totalMinutes % 60;
-      total = `${hours}:${minutes.toString().padStart(2, '0')}`;
+  try {
+    const { startMonth, startYear, endMonth, endYear } = req.query;
+    
+    let startDate, endDate;
+    
+    if (startMonth && startYear && endMonth && endYear) {
+      // Use provided month range
+      startDate = `${startYear}-${String(startMonth).padStart(2, '0')}-01`;
+      const lastDay = new Date(parseInt(endYear), parseInt(endMonth), 0).getDate();
+      endDate = `${endYear}-${String(endMonth).padStart(2, '0')}-${lastDay}`;
+    } else {
+      // Default: all entries (find min/max dates)
+      const rangeStmt = db.prepare('SELECT MIN(date) as minDate, MAX(date) as maxDate FROM entries WHERE user_id = ?');
+      const range = rangeStmt.get(req.user.id);
+      
+      if (!range.minDate || !range.maxDate) {
+        return res.status(404).json({ error: 'No entries found' });
+      }
+      
+      startDate = range.minDate;
+      endDate = range.maxDate;
     }
     
-    worksheet.addRow({
-      date: entry.date,
-      check_in: entry.check_in || '',
-      check_out: entry.check_out || '',
-      total: total,
-      comment: entry.comment || ''
-    });
-  });
-  
-  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  res.setHeader('Content-Disposition', `attachment; filename=time-tracking-${req.user.username}.xlsx`);
-  
-  await workbook.xlsx.write(res);
-  res.end();
+    const buffer = await excelReport.generateReport(req.user.id, startDate, endDate);
+    
+    if (!buffer) {
+      return res.status(404).json({ error: 'No entries found for the selected period' });
+    }
+    
+    const filename = ExcelReport.generateFilename(req.user.username, startDate, endDate);
+    
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+    res.send(Buffer.from(buffer));
+  } catch (err) {
+    console.error('Export error:', err);
+    res.status(500).json({ error: 'Export failed' });
+  }
 });
 
 app.get('/api/settings', requireAuth, (req, res) => {
