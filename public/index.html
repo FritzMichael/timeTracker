@@ -1178,38 +1178,50 @@
         }
         
         function updateUI() {
+            if (!currentStatus) {
+                console.error('updateUI called but currentStatus is null/undefined');
+                return;
+            }
+            
             const statusEl = document.getElementById('status');
             const clockInSection = document.getElementById('clock-in-section');
             const clockOutSection = document.getElementById('clock-out-section');
-            const lastTaskEl = document.getElementById('last-task');
-            const lastTaskContentEl = document.getElementById('last-task-content');
-            const lastTaskDateEl = document.getElementById('last-task-date');
             
-            // Display last comment if available
-            if (currentStatus.lastComment) {
-                lastTaskEl.classList.remove('hidden');
-                lastTaskContentEl.textContent = currentStatus.lastComment;
+            // Display last comment if available (wrapped in try-catch for safety)
+            try {
+                const lastTaskEl = document.getElementById('last-task');
+                const lastTaskContentEl = document.getElementById('last-task-content');
+                const lastTaskDateEl = document.getElementById('last-task-date');
                 
-                // Format the date nicely
-                if (currentStatus.lastCommentDate) {
-                    const date = new Date(currentStatus.lastCommentDate + 'T00:00:00');
-                    const today = new Date();
-                    today.setHours(0, 0, 0, 0);
-                    const yesterday = new Date(today);
-                    yesterday.setDate(yesterday.getDate() - 1);
-                    
-                    let dateStr;
-                    if (date.getTime() === today.getTime()) {
-                        dateStr = 'Today';
-                    } else if (date.getTime() === yesterday.getTime()) {
-                        dateStr = 'Yesterday';
+                if (lastTaskEl) {
+                    if (currentStatus.lastComment) {
+                        lastTaskEl.classList.remove('hidden');
+                        if (lastTaskContentEl) lastTaskContentEl.textContent = currentStatus.lastComment;
+                        
+                        // Format the date nicely
+                        if (currentStatus.lastCommentDate && lastTaskDateEl) {
+                            const date = new Date(currentStatus.lastCommentDate + 'T00:00:00');
+                            const today = new Date();
+                            today.setHours(0, 0, 0, 0);
+                            const yesterday = new Date(today);
+                            yesterday.setDate(yesterday.getDate() - 1);
+                            
+                            let dateStr;
+                            if (date.getTime() === today.getTime()) {
+                                dateStr = 'Today';
+                            } else if (date.getTime() === yesterday.getTime()) {
+                                dateStr = 'Yesterday';
+                            } else {
+                                dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                            }
+                            lastTaskDateEl.textContent = dateStr;
+                        }
                     } else {
-                        dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                        lastTaskEl.classList.add('hidden');
                     }
-                    lastTaskDateEl.textContent = dateStr;
                 }
-            } else {
-                lastTaskEl.classList.add('hidden');
+            } catch (err) {
+                console.error('Error displaying last task:', err);
             }
             
             if (!currentStatus.hasEntry || currentStatus.checkedOut) {
