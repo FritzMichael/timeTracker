@@ -1,7 +1,13 @@
-const CACHE_NAME = 'time-tracker-v1';
+const CACHE_NAME = 'time-tracker-v2';
 const urlsToCache = [
   '/',
-  '/manifest.json'
+  '/index.html',
+  '/manifest.json',
+  '/icon-192.png',
+  '/icon-512.png',
+  '/vendor/flatpickr.min.css',
+  '/vendor/flatpickr-airbnb.css',
+  '/vendor/flatpickr.min.js'
 ];
 
 self.addEventListener('install', event => {

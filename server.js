@@ -21,6 +21,13 @@ app.set('trust proxy', 1);
 
 // Middleware
 app.use(express.json());
+
+// Serve manifest.json with correct content-type
+app.get('/manifest.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/manifest+json');
+  res.sendFile(path.join(__dirname, 'public', 'manifest.json'));
+});
+
 app.use(express.static('public'));
 
 // Initialize SQLite database
@@ -592,7 +599,13 @@ function checkReminders() {
 
 setInterval(checkReminders, 60000);
 
+// Development helper: Icon generator
+app.get('/generate-icons', (req, res) => {
+  res.sendFile(path.join(__dirname, 'icon-generator.html'));
+});
+
 app.listen(PORT, () => {
   console.log(`Time Tracker running on http://localhost:${PORT}`);
   console.log(`GitHub OAuth: ${githubEnabled ? 'Enabled' : 'Disabled (set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET to enable)'}`);
+  console.log(`\n⚠  PWA Setup: Visit http://localhost:${PORT}/generate-icons to create icon files`);
 });
