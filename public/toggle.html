@@ -263,13 +263,34 @@
     <script>
         let currentEntryId = null;
         
+        // Helper function to get local date, time, and timezone
+        function getLocalDateTime() {
+            const now = new Date();
+            const date = now.toLocaleDateString('en-CA'); // YYYY-MM-DD format
+            const time = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }); // HH:MM format
+            
+            // Get timezone with fallback for older browsers
+            let timezone;
+            try {
+                timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            } catch (e) {
+                // Fallback for browsers that don't support timezone detection
+                timezone = null;
+                console.warn('Timezone detection not supported in this browser');
+            }
+            
+            return { date, time, timezone };
+        }
+        
         async function toggle() {
             showState('loading');
             
             try {
+                const { date, time, timezone } = getLocalDateTime();
                 const res = await fetch('/api/toggle', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ date, time, timezone })
                 });
                 
                 if (res.status === 401) {
