@@ -119,6 +119,14 @@
             border: 2px solid #f59e0b;
         }
         
+        .timezone-info {
+            font-size: 11px;
+            color: #6b7280;
+            text-align: center;
+            margin-bottom: 16px;
+            padding: 4px;
+        }
+        
         .last-task {
             background: #f9fafb;
             border-left: 4px solid #2563eb;
@@ -771,6 +779,8 @@
             
             <div id="status" class="status"></div>
             
+            <div class="timezone-info" id="timezone-info"></div>
+            
             <div id="last-task" class="last-task hidden">
                 <div class="last-task-label">Last worked on</div>
                 <div class="last-task-content" id="last-task-content"></div>
@@ -1198,9 +1208,19 @@
             }
         }
         
+        // Helper function to get local date, time, and timezone
+        function getLocalDateTime() {
+            const now = new Date();
+            const date = now.toLocaleDateString('en-CA'); // YYYY-MM-DD format
+            const time = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }); // HH:MM format
+            const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            return { date, time, timezone };
+        }
+        
         async function loadStatus() {
             try {
-                const res = await fetch('/api/status');
+                const { date } = getLocalDateTime();
+                const res = await fetch(`/api/status?date=${date}`);
                 if (res.status === 401) {
                     showAuth();
                     return;
@@ -1221,6 +1241,13 @@
             const statusEl = document.getElementById('status');
             const clockInSection = document.getElementById('clock-in-section');
             const clockOutSection = document.getElementById('clock-out-section');
+            
+            // Display timezone info
+            const timezoneInfoEl = document.getElementById('timezone-info');
+            if (timezoneInfoEl) {
+                const { timezone } = getLocalDateTime();
+                timezoneInfoEl.textContent = `🌍 Times are logged in your local timezone (${timezone})`;
+            }
             
             // Display last comment if available (wrapped in try-catch for safety)
             try {
@@ -1291,7 +1318,12 @@
         
         async function clockIn() {
             try {
-                const res = await fetch('/api/clock-in', { method: 'POST' });
+                const { date, time, timezone } = getLocalDateTime();
+                const res = await fetch('/api/clock-in', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ date, time, timezone })
+                });
                 const data = await res.json();
                 if (data.error) {
                     alert(data.error);
@@ -1306,10 +1338,11 @@
         async function clockOut() {
             const comment = document.getElementById('comment').value;
             try {
+                const { date, time, timezone } = getLocalDateTime();
                 const res = await fetch('/api/clock-out', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ comment })
+                    body: JSON.stringify({ comment, date, time, timezone })
                 });
                 const data = await res.json();
                 if (data.error) {
