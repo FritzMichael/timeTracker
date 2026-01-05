@@ -124,6 +124,28 @@ Excel reports now include a note:
 
 Each entry in the export shows times exactly as they were logged in the user's local timezone.
 
+## Push Notification Reminders
+
+Push notification reminders (e.g., "Did you forget to clock out?") are sent based on the **user's local timezone**, not the server's timezone.
+
+### How It Works
+
+1. **User Sets Reminder Time**: User configures reminder time in Settings (e.g., 20:00)
+2. **Timezone Detection**: System uses the timezone from the user's most recent entry
+3. **Local Time Check**: Server converts current time to user's timezone before checking
+4. **Notification Sent**: Reminder is sent when it's the specified time in the user's timezone
+
+### Example
+
+- User in New York (EST) sets reminder to 20:00
+- User clocks in, timezone `America/New_York` is stored
+- Server checks every minute:
+  - Server time: 01:00 UTC (next day)
+  - Converts to user's timezone: 20:00 EST
+  - Match! → Sends reminder
+
+**Backward Compatibility**: If a user has no timezone data in their entries, the system falls back to server time for reminders.
+
 ## Future Enhancements
 
 Potential improvements for future versions:

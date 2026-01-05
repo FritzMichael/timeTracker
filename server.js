@@ -683,17 +683,52 @@ function checkReminders() {
   `);
   const users = usersStmt.all();
   
-  const now = new Date();
-  const currentTime = now.toTimeString().slice(0, 5);
-  const today = now.toISOString().split('T')[0];
+  const serverNow = new Date();
   
   users.forEach(user => {
     const reminderTime = user.reminder_time || '20:00';
     
-    if (currentTime !== reminderTime) return;
+    // Get user's last used timezone from their most recent entry
+    const lastEntryStmt = db.prepare(
+      'SELECT timezone FROM entries WHERE user_id = ? AND timezone IS NOT NULL ORDER BY id DESC LIMIT 1'
+    );
+    const lastEntry = lastEntryStmt.get(user.id);
+    
+    // If user has no timezone data, fall back to server time (backward compatibility)
+    if (!lastEntry || !lastEntry.timezone) {
+      const currentTime = serverNow.toTimeString().slice(0, 5);
+      if (currentTime !== reminderTime) return;
+    } else {
+      // Convert server time to user's timezone
+      const userTimezone = lastEntry.timezone;
+      try {
+        const userTime = serverNow.toLocaleTimeString('en-GB', {
+          timeZone: userTimezone,
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+        
+        if (userTime !== reminderTime) return;
+      } catch (err) {
+        console.error(`Invalid timezone for user ${user.id}: ${userTimezone}`, err);
+        return;
+      }
+    }
+    
+    // Get user's local date for checking entries
+    let userDate;
+    if (lastEntry && lastEntry.timezone) {
+      try {
+        userDate = serverNow.toLocaleDateString('en-CA', { timeZone: lastEntry.timezone });
+      } catch (err) {
+        userDate = serverNow.toISOString().split('T')[0];
+      }
+    } else {
+      userDate = serverNow.toISOString().split('T')[0];
+    }
     
     const entryStmt = db.prepare('SELECT * FROM entries WHERE user_id = ? AND date = ? ORDER BY id DESC LIMIT 1');
-    const entry = entryStmt.get(user.id, today);
+    const entry = entryStmt.get(user.id, userDate);
     
     if (entry && entry.check_in && !entry.check_out) {
       const subsStmt = db.prepare('SELECT * FROM subscriptions WHERE user_id = ?');
