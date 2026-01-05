@@ -268,7 +268,17 @@
             const now = new Date();
             const date = now.toLocaleDateString('en-CA'); // YYYY-MM-DD format
             const time = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }); // HH:MM format
-            const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            
+            // Get timezone with fallback for older browsers
+            let timezone;
+            try {
+                timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            } catch (e) {
+                // Fallback for browsers that don't support timezone detection
+                timezone = null;
+                console.warn('Timezone detection not supported in this browser');
+            }
+            
             return { date, time, timezone };
         }
         

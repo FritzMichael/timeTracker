@@ -89,11 +89,16 @@ try {
   const hasTimezone = tableInfo.some(col => col.name === 'timezone');
   
   if (!hasTimezone) {
+    console.log('Running database migration: Adding timezone column to entries table...');
     db.exec('ALTER TABLE entries ADD COLUMN timezone TEXT');
-    console.log('✅ Added timezone column to entries table');
+    console.log('✅ Migration successful: timezone column added to entries table');
   }
 } catch (err) {
-  console.error('Error adding timezone column:', err);
+  console.error('❌ Database migration failed:', err.message);
+  console.error('   Details:', err);
+  console.error('   The application may not function correctly. Please check database permissions.');
+  // Don't crash the server - allow it to start even if migration fails
+  // This maintains availability while alerting admins to the issue
 }
 
 // Session configuration
@@ -416,7 +421,9 @@ app.post('/api/clock-out', requireAuth, (req, res) => {
     return res.status(400).json({ error: 'Already clocked out' });
   }
   
-  // Update timezone if provided and not already set
+  // Update entry with check-out time and comment
+  // Note: We preserve the timezone from check-in (using COALESCE) to maintain consistency
+  // for duration calculations, even if user's timezone changed between check-in and check-out
   const updateStmt = db.prepare('UPDATE entries SET check_out = ?, comment = ?, timezone = COALESCE(timezone, ?) WHERE id = ? AND user_id = ?');
   updateStmt.run(now, comment || null, timezone || null, entry.id, req.user.id);
   
