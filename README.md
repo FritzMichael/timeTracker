@@ -8,6 +8,7 @@ Very basic, mostly vibe coded - still useful for simple time tracking needs.
 - ✅ **Multi-user support** with user accounts
 - ✅ **Local authentication** (username/password)
 - ✅ **GitHub OAuth** (optional)
+- ✅ **Timezone aware** - logs times in user's local timezone
 - ✅ Clock in/out with NFC tags
 - ✅ Track work hours automatically
 - ✅ Add daily comments/notes
@@ -130,7 +131,18 @@ docker run --rm -v timetracker_data:/data -v $(pwd):/backup alpine tar czf /back
 
 ## Export to Excel
 
-Click the "Export to Excel" button in the History tab to download all your time entries as an Excel file.
+Click the "Export to Excel" button in the History tab to download all your time entries as an Excel file. Times are exported in your local timezone as they were logged.
+
+## Timezone Handling
+
+The app logs all times in your **local timezone**, not the server's timezone. This means:
+
+- If you clock in at 9:00 AM in New York, it's stored as 9:00 AM (not 2:00 PM UTC)
+- Date boundaries are correct for your timezone (11 PM doesn't become next day)
+- When traveling, times are logged in your current timezone
+- Excel exports show times exactly as you logged them
+
+For more details, see [TIMEZONE.md](TIMEZONE.md).
 
 ## Environment Variables
 
