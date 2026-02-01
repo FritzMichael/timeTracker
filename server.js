@@ -55,6 +55,7 @@ db.exec(`
     check_in TEXT,
     check_out TEXT,
     comment TEXT,
+    timezone TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id)
   );
@@ -81,6 +82,24 @@ db.exec(`
     value TEXT
   );
 `);
+
+// Migration: Add timezone column to entries table if it doesn't exist
+try {
+  const tableInfo = db.prepare("PRAGMA table_info(entries)").all();
+  const hasTimezone = tableInfo.some(col => col.name === 'timezone');
+  
+  if (!hasTimezone) {
+    console.log('Running database migration: Adding timezone column to entries table...');
+    db.exec('ALTER TABLE entries ADD COLUMN timezone TEXT');
+    console.log('✅ Migration successful: timezone column added to entries table');
+  }
+} catch (err) {
+  console.error('❌ Database migration failed:', err.message);
+  console.error('   Details:', err);
+  console.error('   The application may not function correctly. Please check database permissions.');
+  // Don't crash the server - allow it to start even if migration fails
+  // This maintains availability while alerting admins to the issue
+}
 
 // Session configuration
 app.use(session({
@@ -325,7 +344,8 @@ app.get('/api/vapid-public-key', (req, res) => {
 
 app.get('/api/status', requireAuth, (req, res) => {
   try {
-    const today = new Date().toISOString().split('T')[0];
+    // Accept client date from query parameter for proper timezone handling
+    const today = req.query.date || new Date().toISOString().split('T')[0];
     const stmt = db.prepare('SELECT * FROM entries WHERE user_id = ? AND date = ? ORDER BY id DESC LIMIT 1');
     const entry = stmt.get(req.user.id, today);
     
@@ -361,8 +381,13 @@ app.get('/api/status', requireAuth, (req, res) => {
 });
 
 app.post('/api/clock-in', requireAuth, (req, res) => {
-  const today = new Date().toISOString().split('T')[0];
-  const now = new Date().toTimeString().slice(0, 5);
+  // Accept client time and timezone
+  const { date, time, timezone } = req.body;
+  
+  // Fallback to server time if client doesn't send time (backward compatibility)
+  const today = date || new Date().toISOString().split('T')[0];
+  const now = time || new Date().toTimeString().slice(0, 5);
+  const tz = timezone || null;
   
   const checkStmt = db.prepare('SELECT * FROM entries WHERE user_id = ? AND date = ? ORDER BY id DESC LIMIT 1');
   const existing = checkStmt.get(req.user.id, today);
@@ -371,16 +396,19 @@ app.post('/api/clock-in', requireAuth, (req, res) => {
     return res.status(400).json({ error: 'Already clocked in' });
   }
   
-  const insertStmt = db.prepare('INSERT INTO entries (user_id, date, check_in) VALUES (?, ?, ?)');
-  const result = insertStmt.run(req.user.id, today, now);
+  const insertStmt = db.prepare('INSERT INTO entries (user_id, date, check_in, timezone) VALUES (?, ?, ?, ?)');
+  const result = insertStmt.run(req.user.id, today, now, tz);
   
   res.json({ success: true, id: result.lastInsertRowid, time: now });
 });
 
 app.post('/api/clock-out', requireAuth, (req, res) => {
-  const { comment } = req.body;
-  const today = new Date().toISOString().split('T')[0];
-  const now = new Date().toTimeString().slice(0, 5);
+  // Accept client time and timezone
+  const { comment, date, time, timezone } = req.body;
+  
+  // Fallback to server time if client doesn't send time (backward compatibility)
+  const today = date || new Date().toISOString().split('T')[0];
+  const now = time || new Date().toTimeString().slice(0, 5);
   
   const stmt = db.prepare('SELECT * FROM entries WHERE user_id = ? AND date = ? ORDER BY id DESC LIMIT 1');
   const entry = stmt.get(req.user.id, today);
@@ -393,8 +421,11 @@ app.post('/api/clock-out', requireAuth, (req, res) => {
     return res.status(400).json({ error: 'Already clocked out' });
   }
   
-  const updateStmt = db.prepare('UPDATE entries SET check_out = ?, comment = ? WHERE id = ? AND user_id = ?');
-  updateStmt.run(now, comment || null, entry.id, req.user.id);
+  // Update entry with check-out time and comment
+  // Note: We preserve the timezone from check-in (using COALESCE) to maintain consistency
+  // for duration calculations, even if user's timezone changed between check-in and check-out
+  const updateStmt = db.prepare('UPDATE entries SET check_out = ?, comment = ?, timezone = COALESCE(timezone, ?) WHERE id = ? AND user_id = ?');
+  updateStmt.run(now, comment || null, timezone || null, entry.id, req.user.id);
   
   res.json({ success: true, time: now });
 });
@@ -402,8 +433,13 @@ app.post('/api/clock-out', requireAuth, (req, res) => {
 // Toggle endpoint for NFC/quick check-in/out
 app.post('/api/toggle', requireAuth, (req, res) => {
   try {
-    const today = new Date().toISOString().split('T')[0];
-    const now = new Date().toTimeString().slice(0, 5);
+    // Accept client time and timezone
+    const { date, time, timezone } = req.body;
+    
+    // Fallback to server time if client doesn't send time (backward compatibility)
+    const today = date || new Date().toISOString().split('T')[0];
+    const now = time || new Date().toTimeString().slice(0, 5);
+    const tz = timezone || null;
     
     // Check current status
     const stmt = db.prepare('SELECT * FROM entries WHERE user_id = ? AND date = ? ORDER BY id DESC LIMIT 1');
@@ -411,8 +447,8 @@ app.post('/api/toggle', requireAuth, (req, res) => {
     
     // If no entry today or already checked out -> check in
     if (!entry || entry.check_out) {
-      const insertStmt = db.prepare('INSERT INTO entries (user_id, date, check_in) VALUES (?, ?, ?)');
-      const result = insertStmt.run(req.user.id, today, now);
+      const insertStmt = db.prepare('INSERT INTO entries (user_id, date, check_in, timezone) VALUES (?, ?, ?, ?)');
+      const result = insertStmt.run(req.user.id, today, now, tz);
       
       // Get the last entry with a comment
       let lastComment = null;
@@ -439,8 +475,8 @@ app.post('/api/toggle', requireAuth, (req, res) => {
     
     // If checked in but not out -> check out
     if (entry.check_in && !entry.check_out) {
-      const updateStmt = db.prepare('UPDATE entries SET check_out = ? WHERE id = ? AND user_id = ?');
-      updateStmt.run(now, entry.id, req.user.id);
+      const updateStmt = db.prepare('UPDATE entries SET check_out = ?, timezone = COALESCE(timezone, ?) WHERE id = ? AND user_id = ?');
+      updateStmt.run(now, tz, entry.id, req.user.id);
       
       // Calculate duration
       const [inH, inM] = entry.check_in.split(':').map(Number);
@@ -647,17 +683,52 @@ function checkReminders() {
   `);
   const users = usersStmt.all();
   
-  const now = new Date();
-  const currentTime = now.toTimeString().slice(0, 5);
-  const today = now.toISOString().split('T')[0];
+  const serverNow = new Date();
   
   users.forEach(user => {
     const reminderTime = user.reminder_time || '20:00';
     
-    if (currentTime !== reminderTime) return;
+    // Get user's last used timezone from their most recent entry
+    const lastEntryStmt = db.prepare(
+      'SELECT timezone FROM entries WHERE user_id = ? AND timezone IS NOT NULL ORDER BY id DESC LIMIT 1'
+    );
+    const lastEntry = lastEntryStmt.get(user.id);
+    
+    // If user has no timezone data, fall back to server time (backward compatibility)
+    if (!lastEntry || !lastEntry.timezone) {
+      const currentTime = serverNow.toTimeString().slice(0, 5);
+      if (currentTime !== reminderTime) return;
+    } else {
+      // Convert server time to user's timezone
+      const userTimezone = lastEntry.timezone;
+      try {
+        const userTime = serverNow.toLocaleTimeString('en-GB', {
+          timeZone: userTimezone,
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+        
+        if (userTime !== reminderTime) return;
+      } catch (err) {
+        console.error(`Invalid timezone for user ${user.id}: ${userTimezone}`, err);
+        return;
+      }
+    }
+    
+    // Get user's local date for checking entries
+    let userDate;
+    if (lastEntry && lastEntry.timezone) {
+      try {
+        userDate = serverNow.toLocaleDateString('en-CA', { timeZone: lastEntry.timezone });
+      } catch (err) {
+        userDate = serverNow.toISOString().split('T')[0];
+      }
+    } else {
+      userDate = serverNow.toISOString().split('T')[0];
+    }
     
     const entryStmt = db.prepare('SELECT * FROM entries WHERE user_id = ? AND date = ? ORDER BY id DESC LIMIT 1');
-    const entry = entryStmt.get(user.id, today);
+    const entry = entryStmt.get(user.id, userDate);
     
     if (entry && entry.check_in && !entry.check_out) {
       const subsStmt = db.prepare('SELECT * FROM subscriptions WHERE user_id = ?');
